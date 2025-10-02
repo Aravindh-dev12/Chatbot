@@ -25,8 +25,7 @@ The application offers a responsive chat interface, secure API integration, and 
 
 * **Frontend**: React, JavaScript, Tailwind CSS
 * **Backend**: Python (FastAPI or Flask)
-* **API Integration**: OpenAI / Gemini / Hugging Face
-* **Deployment Options**: Render, Railway, Netlify
+* **API Integration**: Gemini
 
 ---
 
