@@ -132,5 +132,7 @@ def chat():
         return jsonify({"error": f"Error calling Gemini API: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    # bind to 127.0.0.1:5000 by default
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))  # Use Render's PORT if available
+    app.run(host="0.0.0.0", port=port, debug=True)
+
