@@ -1,3 +1,6 @@
 flask
 google-genai
 flask-cors
+fastapi
+uvicorn
+google-generativeai
