@@ -9,7 +9,6 @@ import traceback
 load_dotenv()
 
 app = Flask(__name__)
-# Dev CORS - allow everything for local development
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 API_KEY = os.getenv("GENAI_API_KEY")
