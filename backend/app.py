@@ -12,7 +12,6 @@ import random
 load_dotenv()
 
 app = Flask(__name__)
-# Dev CORS - allow everything for local development
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 API_KEY = os.getenv("GENAI_API_KEY")
@@ -20,7 +19,7 @@ if not API_KEY:
     print("WARNING: GENAI_API_KEY not set in environment. Set it in your .env for real requests.")
 genai.configure(api_key=API_KEY)
 
-# create model handle
+# create model handle (keep your configured model)
 model = genai.GenerativeModel("gemini-2.0-flash")
 
 # Load intents.json at startup
@@ -28,61 +27,52 @@ INTENTS_PATH = os.path.join(os.path.dirname(__file__), "intents.json")
 try:
     with open(INTENTS_PATH, "r", encoding="utf-8") as f:
         intents_data = json.load(f)
-        # Expecting the top-level structure to be {"intents": [...]}
         intents = intents_data.get("intents", intents_data) if isinstance(intents_data, dict) else intents_data
 except Exception as e:
     print(f"Could not load intents.json from {INTENTS_PATH}: {e}")
     intents = []
 
-# Preprocess patterns for faster matching (lowercase)
+def normalize_text(s: str) -> str:
+    """Lowercase, remove punctuation, collapse whitespace for robust matching."""
+    if not isinstance(s, str):
+        return ""
+    s = s.lower()
+    # replace any non-word characters with space (keeps letters/numbers/underscore)
+    s = re.sub(r"[^\w\s]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+# Precompute normalized patterns for matching
 for intent in intents:
     patterns = intent.get("patterns", [])
-    intent["_patterns_lc"] = [p.lower() for p in patterns if isinstance(p, str)]
+    intent["_patterns_norm"] = [normalize_text(p) for p in patterns if isinstance(p, str)]
 
 def extract_user_text_from_request(data):
-    """
-    Return the most relevant user text to match against intents or send to Gemini.
-    Supports:
-      - {"messages": [{ "sender":"user"/"bot", "text": "..." }, ...]}
-      - {"contents": [ ... ]} where elements may be {"text":"..."} or generative format
-    Strategy:
-      - If 'messages' exists, take the last message whose sender is 'user' (case-insensitive)
-        or the last message overall if no explicit user entry.
-      - Else, if 'contents' is present, take the last dict element that has 'text' or parts.
-      - Else, fallback to empty string.
-    """
-    # messages style
+    # (same robust extraction as before)
     messages = data.get("messages")
     if isinstance(messages, list) and len(messages) > 0:
-        # find last user message
         for m in reversed(messages):
             sender = (m.get("sender") or "").lower()
             if sender == "user":
                 return m.get("text", "") or ""
-        # fallback: last message text
         last = messages[-1]
         return last.get("text", "") if isinstance(last, dict) else str(last)
 
-    # contents style
     contents = data.get("contents")
     if isinstance(contents, list) and len(contents) > 0:
-        # look for dicts with 'text' or 'parts'
         for c in reversed(contents):
             if isinstance(c, dict):
                 if "text" in c and isinstance(c["text"], str):
                     return c["text"]
                 if "parts" in c and isinstance(c["parts"], list) and len(c["parts"]) > 0:
-                    # parts are often [{"text":"..."}]
                     p0 = c["parts"][-1]
                     if isinstance(p0, dict) and "text" in p0:
                         return p0["text"]
             elif isinstance(c, str):
                 return c
-        # fallback: stringify last element
         last = contents[-1]
         return last.get("text", "") if isinstance(last, dict) else str(last)
 
-    # try message raw 'text' field
     if "text" in data and isinstance(data["text"], str):
         return data["text"]
 
@@ -90,55 +80,45 @@ def extract_user_text_from_request(data):
 
 def match_intent(user_text):
     """
-    Try to match user_text to an intent in intents (loaded from intents.json).
-    Simple strategy:
-      - Lowercase the user_text.
-      - For each pattern in intents, check if the pattern is a substring of user_text or vice-versa.
-      - Prefer exact word-boundary matches where possible.
-      - Ignore the 'unrecognized_input' tag to avoid accidentally matching a catch-all pattern like '.*'.
-    Returns: (intent_obj or None)
+    Return (matched_intent_obj, matched_pattern_index) or (None, None)
+    We try:
+      1) exact normalized equality
+      2) normalized pattern in normalized text (substring)
+      3) normalized text in normalized pattern
     """
     if not user_text:
-        return None
-    text = user_text.lower()
+        return None, None
+    text_norm = normalize_text(user_text)
 
-    # clean text for word-boundary searching
     for intent in intents:
         tag = intent.get("tag", "")
-        # skip the catch-all / fallback intent because we want to fallback to AI instead
+        # Optional: skip catch-all fallback intents if you want AI fallback
         if tag == "unrecognized_input":
             continue
 
-        patterns = intent.get("_patterns_lc", [])
-        for patt in patterns:
-            if not patt:
+        patterns_norm = intent.get("_patterns_norm", [])
+        for idx, patt_norm in enumerate(patterns_norm):
+            if not patt_norm:
                 continue
-            # If the pattern looks like a plain phrase, try word-boundary match first
-            try:
-                # escape and use word boundaries
-                escaped = re.escape(patt)
-                # If pattern contains non-word characters/spaces, simple in-check is fine
-                if re.search(r"\b" + escaped + r"\b", text):
-                    return intent
-            except re.error:
-                # fallback to substring when regex escaping fails
-                pass
+            # 1) exact normalized match
+            if patt_norm == text_norm:
+                return intent, idx
+            # 2) substring matches (pattern in user text)
+            if patt_norm in text_norm:
+                return intent, idx
+            # 3) user text contained in pattern (rare but useful)
+            if text_norm in patt_norm:
+                return intent, idx
 
-            # substring checks (pattern in text or text in pattern)
-            if patt in text or text in patt:
-                return intent
-
-    return None
+    return None, None
 
 @app.route("/")
 def home():
     return "Flask backend is running! Use /chat or /api/chat to chat."
 
-# Both endpoints map to same handler so frontend can call /chat or /api/chat
 @app.route("/chat", methods=["OPTIONS", "POST"])
 @app.route("/api/chat", methods=["OPTIONS", "POST"])
 def chat():
-    # Flask-CORS handles OPTIONS, but we accept it to avoid 404s in some setups
     if request.method == "OPTIONS":
         return jsonify({"ok": True}), 200
 
@@ -149,26 +129,33 @@ def chat():
 
     messages = data.get("messages")
     contents = data.get("contents")
-    if not messages and not contents and not data.get("text") and not data.get("contents"):
+    if not messages and not contents and not data.get("text"):
         return jsonify({"error": "No messages/contents provided or invalid format"}), 400
 
-    # Extract the single user text we will attempt to answer from intents.json first
     user_text = extract_user_text_from_request(data)
-    print("Extracted user text for intent matching / AI:", user_text)
+    print("User text extracted:", user_text)
 
-    # 1) Try to match to intents.json
-    matched_intent = match_intent(user_text)
-    if matched_intent:
-        # choose a random response from intent
-        responses = matched_intent.get("responses", [])
-        if responses:
+    # Try local intents first
+    intent_obj, patt_idx = match_intent(user_text)
+    if intent_obj:
+        responses = intent_obj.get("responses", [])
+        reply_text = None
+        # Prefer a response at the same index as the matched pattern
+        if patt_idx is not None and isinstance(patt_idx, int) and patt_idx < len(responses):
+            reply_text = responses[patt_idx]
+        elif len(responses) == 1:
+            reply_text = responses[0]
+        elif len(responses) > 1:
+            # fallback: find any response that contains some keywords? for now pick random
+            # (but we prefer to avoid random if user expects a specific answer)
             reply_text = random.choice(responses)
-            return jsonify({"reply": reply_text, "source": "intents", "intent": matched_intent.get("tag")}), 200
 
-    # 2) No intent match -> fall back to AI (Gemini)
-    # Normalize into a list of content-parts acceptable to your model.generate_content usage
+        if reply_text:
+            return jsonify({"reply": reply_text, "source": "intents", "intent": intent_obj.get("tag")}), 200
+
+    # No local intent match -> send to AI (Gemini)
+    # Normalize into the expected structure
     normalized = []
-
     if messages and isinstance(messages, list):
         for m in messages:
             role = m.get("sender", "").lower()
@@ -185,7 +172,6 @@ def chat():
             else:
                 normalized.append({"role": "user", "parts": [{"text": str(c)}]})
     else:
-        # fallback: use the extracted user_text as single user message
         normalized.append({"role": "user", "parts": [{"text": user_text}]})
 
     print("Normalized request to send to Gemini:", normalized)
@@ -193,14 +179,9 @@ def chat():
     try:
         response = model.generate_content(normalized)
 
-        # Robustly extract text from different response shapes
         reply_text = None
-
-        # 1) Some SDKs return an object with .text
         if hasattr(response, "text") and getattr(response, "text"):
             reply_text = getattr(response, "text")
-
-        # 2) dict-style (from .to_dict() or JSON)
         elif isinstance(response, dict):
             if response.get("reply"):
                 reply_text = response.get("reply")
@@ -211,8 +192,6 @@ def chat():
                     reply_text = response["candidates"][0]["content"]["parts"][0]["text"]
                 except Exception:
                     reply_text = None
-
-        # 3) object with candidates attribute
         else:
             candidates = getattr(response, "candidates", None)
             if candidates:
@@ -233,7 +212,6 @@ def chat():
             except Exception:
                 reply_text = "No textual reply found in model response."
 
-        print("Reply extracted from AI:", reply_text)
         return jsonify({"reply": reply_text, "source": "ai"}), 200
 
     except Exception as e:
@@ -241,6 +219,5 @@ def chat():
         return jsonify({"error": f"Error calling Gemini API: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 5000))  # Use Render's PORT if available
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
