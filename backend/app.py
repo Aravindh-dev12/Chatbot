@@ -104,7 +104,7 @@ def call_gemini(prompt_text):
     Returns tuple (reply_text, error_if_any)
     The function tries several common shapes of responses to be robust across SDK versions.
     """
-    api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GENAI_API_KEY") or os.environ.get("GENAI_API_KEY")
     if not api_key:
         return None, "Gemini API key not configured. Set environment variable GOOGLE_API_KEY."
 
