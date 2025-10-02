@@ -4,3 +4,6 @@ flask-cors
 fastapi
 uvicorn
 google-generativeai
+openai
+requests
+python-dotenv
