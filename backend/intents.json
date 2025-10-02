@@ -1,0 +1,377 @@
+{
+  "intents": [
+    {
+      "tag": "greeting",
+      "patterns": [
+        "Hi",
+        "Hello",
+        "Hey",
+        "Good morning",
+        "Good afternoon",
+        "Is anyone there?",
+        "Hey there",
+        "Hi chatbot",
+        "Hello chatbot",
+        "What's up",
+        "How's it going"
+      ],
+      "responses": [
+        "Hello! How can I help you today?",
+        "Hi — ask me about the latest news, startups, markets, or general info.",
+        "Hey! Want trending headlines, startup updates, or a quick explanation of something?"
+      ],
+      "context_set": "greeting"
+    },
+
+    {
+      "tag": "news_trending",
+      "patterns": [
+        "What's the latest news?",
+        "Any breaking news?",
+        "Show me today's headlines",
+        "current affairs",
+        "top stories right now",
+        "news update",
+        "latest headlines",
+        "what's happening today"
+      ],
+      "responses": [
+        "I can fetch the latest headlines — would you like global news, India news, or a specific topic (politics, tech, business)?",
+        "Give me a topic (e.g., 'global', 'India', 'technology') and I'll show recent headlines. For live updates, connect a news API."
+      ]
+    },
+
+    {
+      "tag": "politics",
+      "patterns": [
+        "What's happening in national politics?",
+        "Any election updates?",
+        "Which bills passed today?",
+        "political news",
+        "who's the prime minister",
+        "presidential election updates"
+      ],
+      "responses": [
+        "I can summarize political developments and election updates. Tell me which country or region you want.",
+        "For detailed, up-to-the-minute election results, connect a live news or election API — I can prepare summaries or explain implications."
+      ]
+    },
+
+    {
+      "tag": "elections",
+      "patterns": [
+        "Election results",
+        "Vote counts",
+        "When is the next election?",
+        "election schedule",
+        "local election update"
+      ],
+      "responses": [
+        "I can provide election schedules, major candidates, and recent results if a data feed is enabled. Which election are you asking about?"
+      ]
+    },
+
+    {
+      "tag": "global_conflict",
+      "patterns": [
+        "War updates",
+        "conflict news",
+        "sanctions on country",
+        "border clashes",
+        "international conflict"
+      ],
+      "responses": [
+        "I can outline reported developments and reliable sources on conflicts. For sensitive or real-time updates, it's best to check official news outlets as well."
+      ]
+    },
+
+    {
+      "tag": "economy_inflation",
+      "patterns": [
+        "What's inflation doing?",
+        "Are prices rising?",
+        "inflation rate",
+        "cost of living update",
+        "economic indicators"
+      ],
+      "responses": [
+        "Inflation is influenced by supply, demand, and policy. I can fetch CPI and central bank signals if a finance feed is available — otherwise I can explain what those indicators mean."
+      ]
+    },
+
+    {
+      "tag": "central_bank",
+      "patterns": [
+        "Did the central bank change rates?",
+        "RBI update",
+        "interest rate news",
+        "monetary policy"
+      ],
+      "responses": [
+        "I can summarize recent central bank announcements (rate decisions, guidance) if you specify the country. Want RBI, Fed, or ECB?"
+      ]
+    },
+
+    {
+      "tag": "ai_ethics",
+      "patterns": [
+        "Is AI ethical?",
+        "AI regulation news",
+        "how to handle model bias",
+        "AI safety"
+      ],
+      "responses": [
+        "AI ethics covers bias, explainability, and safety. I can summarize recent regulatory moves or explain mitigation strategies for biased models."
+      ]
+    },
+
+    {
+      "tag": "climate_change",
+      "patterns": [
+        "Climate news",
+        "global warming update",
+        "carbon emissions",
+        "climate policy"
+      ],
+      "responses": [
+        "I can provide summaries of climate reports, policy updates, and notable events (e.g., conferences). Say 'global' or a country/region for focused info."
+      ]
+    },
+
+    {
+      "tag": "energy",
+      "patterns": [
+        "Oil prices",
+        "renewable energy news",
+        "electricity rates",
+        "energy transition"
+      ],
+      "responses": [
+        "Energy markets move on supply, demand, and policy. I can summarize recent moves in oil, gas or renewables if you specify the market or ticker."
+      ]
+    },
+
+    {
+      "tag": "startups_news",
+      "patterns": [
+        "Any startup funding news?",
+        "Which startups raised money today?",
+        "latest startup launches",
+        "startup acquisitions",
+        "new startups to watch",
+        "funding rounds today",
+        "startup news"
+      ],
+      "responses": [
+        "I can summarize recent startup funding, acquisitions, and product launches — say the region or sector (e.g., 'India fintech')."
+      ]
+    },
+
+    {
+      "tag": "tech_news",
+      "patterns": [
+        "What's new in tech?",
+        "Any product launches from big tech?",
+        "latest AI news",
+        "new phones announced",
+        "technology headlines"
+      ],
+      "responses": [
+        "I can list recent tech product launches, major AI developments, and company announcements. Which subtopic interests you?"
+      ]
+    },
+
+    {
+      "tag": "market_updates",
+      "patterns": [
+        "How is the stock market doing?",
+        "What's the Nifty doing today?",
+        "market update",
+        "stock market news",
+        "cryptocurrency prices"
+      ],
+      "responses": [
+        "I can provide market direction and notable movers if you connect a finance API. Would you like a quick summary or a ticker lookup?"
+      ]
+    },
+
+    {
+      "tag": "sports",
+      "patterns": [
+        "What's the score?",
+        "cricket score",
+        "football results",
+        "sports headlines",
+        "who won the match"
+      ],
+      "responses": [
+        "I can fetch live scores and recent results if a sports data feed is enabled. Tell me the sport or team you care about."
+      ]
+    },
+
+    {
+      "tag": "entertainment",
+      "patterns": [
+        "New movie releases",
+        "celebrity news",
+        "who won best picture",
+        "popular TV shows",
+        "movie reviews"
+      ],
+      "responses": [
+        "I can summarize entertainment headlines and new releases. Want movies, TV, or celebrity updates?"
+      ]
+    },
+
+    {
+      "tag": "health_public",
+      "patterns": [
+        "health advisory",
+        "disease outbreak",
+        "vaccination news",
+        "public health update",
+        "is there any outbreak"
+      ],
+      "responses": [
+        "For public health alerts, I can summarize official advisories; always cross-check with official health departments or WHO for live guidance."
+      ]
+    },
+
+    {
+      "tag": "education_policy",
+      "patterns": [
+        "education news",
+        "exam schedule",
+        "admissions update",
+        "new curriculum",
+        "school reopening"
+      ],
+      "responses": [
+        "I can provide summaries of education policy and major announcements. Tell me the country or exam board for precise info."
+      ]
+    },
+
+    {
+      "tag": "jobs_career",
+      "patterns": [
+        "job openings",
+        "hiring news",
+        "resume tips",
+        "how to prepare for interviews",
+        "remote jobs"
+      ],
+      "responses": [
+        "I can share hiring trends, quick resume tips, or common interview prep steps. Tell me the role or industry and I’ll tailor the advice."
+      ]
+    },
+
+    {
+      "tag": "travel_alerts",
+      "patterns": [
+        "Is travel allowed to X?",
+        "flight cancellations",
+        "travel advisory",
+        "visa updates",
+        "airport strikes"
+      ],
+      "responses": [
+        "Travel restrictions and advisories change fast — I can summarize official advisories for a country/route if you name it, or point you to the government travel site."
+      ]
+    },
+
+    {
+      "tag": "short_explainer",
+      "patterns": [
+        "Explain in one line",
+        "Quick summary of blockchain",
+        "TL;DR on quantum computing",
+        "short explainer AI"
+      ],
+      "responses": [
+        "Sure — ask me a topic and I'll give a one-line explainer, then an optional short paragraph if you want more detail."
+      ]
+    },
+
+    {
+      "tag": "data_sources",
+      "patterns": [
+        "Where do you get news?",
+        "sources",
+        "Which APIs do you use?",
+        "data providers"
+      ],
+      "responses": [
+        "I can be configured to use news APIs (NewsAPI, GDELT), finance feeds (Alpha Vantage, Yahoo), and specialized outlets. Tell me which data type and I can recommend sources."
+      ]
+    },
+
+    {
+      "tag": "subscribe_alerts",
+      "patterns": [
+        "Subscribe me to alerts",
+        "send me daily news",
+        "daily digest",
+        "email me headlines",
+        "push notifications for news"
+      ],
+      "responses": [
+        "I can prepare a subscription flow (daily digest, topic filters) if you provide an email or enable push integration. How often do you want updates?"
+      ]
+    },
+
+    {
+      "tag": "feedback",
+      "patterns": [
+        "This answer is wrong",
+        "I want to report a problem",
+        "feedback",
+        "improve responses",
+        "log this query"
+      ],
+      "responses": [
+        "Thanks — I will log this feedback to improve the knowledge base. Want to add a short note explaining the issue?"
+      ]
+    },
+
+    {
+      "tag": "explain_terms",
+      "patterns": [
+        "What is GDP?",
+        "Define CPI",
+        "Explain quantitative easing",
+        "What is a bear market",
+        "What is market cap"
+      ],
+      "responses": [
+        "GDP — Gross Domestic Product: total value of goods and services produced in a country in a time period.",
+        "CPI — Consumer Price Index: measures the average change in prices paid by consumers for goods and services.",
+        "Quantitative easing — a central bank policy to buy assets to inject liquidity into the economy."
+      ]
+    },
+
+    {
+      "tag": "small_talk",
+      "patterns": [
+        "Tell me a joke",
+        "How are you?",
+        "What can you do?",
+        "Who made you?",
+        "Do you sleep?"
+      ],
+      "responses": [
+        "I don't sleep — I'm here whenever you need a quick news summary or an explainer. What would you like?"
+      ]
+    },
+
+    {
+      "tag": "unrecognized_input",
+      "patterns": [
+        ".*"
+      ],
+      "responses": [
+        "Sorry, I didn't understand that. Try: 'latest headlines', 'startup funding', 'explain IPO', or 'market update for NIFTY'.",
+        "I couldn't match that query — I'll log it to improve the dataset. Meanwhile, try simplifying your question or ask about news/startups/general info."
+      ]
+    }
+  ]
+}
