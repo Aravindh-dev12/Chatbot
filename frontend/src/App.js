@@ -173,7 +173,7 @@ function App() {
   };
 
   // API base (points to your Flask backend). Set REACT_APP_API_BASE_URL in .env if needed.
-  const API_BASE = process.env.REACT_APP_API_BASE_URL || "https://chatbot-1-v6e3.onrender.com";
+  const API_BASE = process.env.REACT_APP_API_BASE_URL || "";
 
   const sendMessage = useCallback(async (predefinedMessage = null) => {
     const messageToSend = predefinedMessage !== null ? predefinedMessage : message.trim();
