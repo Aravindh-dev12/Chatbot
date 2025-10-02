@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { SunIcon, MoonIcon, PaperAirplaneIcon, StopIcon, PlusIcon, SparklesIcon, UserIcon } from "@heroicons/react/24/solid";
+import { SunIcon, MoonIcon, PaperAirplaneIcon, StopIcon, PlusIcon, SparklesIcon, UserIcon, TrashIcon } from "@heroicons/react/24/solid";
 
 function App() {
   const [message, setMessage] = useState("");
@@ -172,8 +172,37 @@ function App() {
     }
   };
 
+  // Clear history function (new)
+  const clearHistory = () => {
+    const confirmed = window.confirm("Clear chat history permanently? This cannot be undone.");
+    if (!confirmed) return;
+
+    // Abort any ongoing request / typing
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      try { abortControllerRef.current.abort(); } catch (e) { /* ignore */ }
+      abortControllerRef.current = null;
+    }
+
+    // Clear chat log and persist
+    setChatLog([]);
+    localStorage.removeItem("chatLog");
+
+    // Reset UI state
+    setLoading(false);
+    setBotTypingText("");
+    botReplyAddedRef.current = false;
+
+    // Scroll to top of chat box (start new conversation)
+    const chatBox = chatBoxRef.current;
+    if (chatBox) chatBox.scrollTop = 0;
+  };
+
   // API base (points to your Flask backend). Set REACT_APP_API_BASE_URL in .env if needed.
-  const API_BASE = process.env.REACT_APP_API_BASE_URL || "";
+  const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:5000";
 
   const sendMessage = useCallback(async (predefinedMessage = null) => {
     const messageToSend = predefinedMessage !== null ? predefinedMessage : message.trim();
@@ -390,6 +419,17 @@ function App() {
           : "bg-gradient-to-br from-blue-50 to-purple-100 text-gray-900"
         }`}
     >
+      {/* Clear History Button (top-right edge) */}
+      <button
+        onClick={clearHistory}
+        title="Clear chat history"
+        aria-label="Clear chat history"
+        className={`absolute top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium shadow-lg transition-transform duration-200 transform hover:scale-105 focus:outline-none
+          ${darkMode ? "bg-gray-800 text-gray-200 border border-gray-700" : "bg-white/90 text-gray-800 border border-gray-200"}`}>
+        <TrashIcon className="h-4 w-4" />
+        <span>Clear history</span>
+      </button>
+
       {/* Header with Separator Line */}
       <div className={`w-full max-w-3xl mb-4 sm:mb-6 pb-4 border-b ${
         darkMode ? "border-gray-700" : "border-gray-300"
