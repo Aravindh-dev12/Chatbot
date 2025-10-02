@@ -1,275 +1,246 @@
-import os
-import json
-import difflib
-import traceback
-from pathlib import Path
+# app.py
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import google.generativeai as genai
+from dotenv import load_dotenv
+import os
+import traceback
+import json
+import re
+import random
 
-# Config
-INTENTS_FILE = Path("intents.json")
-CHAT_HISTORY_FILE = Path("chat_history.json")
-MATCH_CUTOFF = 0.60  # difflib cutoff for a "good" match (0..1)
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5")  # override if needed
+load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+# Dev CORS - allow everything for local development
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Load intents
-if not INTENTS_FILE.exists():
-    raise FileNotFoundError(f"{INTENTS_FILE} not found. Add your intents.json in project root.")
-with INTENTS_FILE.open("r", encoding="utf-8") as f:
-    INTENTS = json.load(f)
+API_KEY = os.getenv("GENAI_API_KEY")
+if not API_KEY:
+    print("WARNING: GENAI_API_KEY not set in environment. Set it in your .env for real requests.")
+genai.configure(api_key=API_KEY)
 
-# Build pattern -> tag map and tag -> responses
-pattern_to_tag = {}
-tag_to_responses = {}
-all_patterns = []
-for intent in INTENTS.get("intents", []):
-    tag = intent.get("tag")
-    tag_to_responses[tag] = intent.get("responses", [])
-    for p in intent.get("patterns", []):
-        norm = p.strip().lower()
-        pattern_to_tag[norm] = tag
-        all_patterns.append(norm)
+# create model handle
+model = genai.GenerativeModel("gemini-2.0-flash")
 
+# Load intents.json at startup
+INTENTS_PATH = os.path.join(os.path.dirname(__file__), "intents.json")
+try:
+    with open(INTENTS_PATH, "r", encoding="utf-8") as f:
+        intents_data = json.load(f)
+        # Expecting the top-level structure to be {"intents": [...]}
+        intents = intents_data.get("intents", intents_data) if isinstance(intents_data, dict) else intents_data
+except Exception as e:
+    print(f"Could not load intents.json from {INTENTS_PATH}: {e}")
+    intents = []
 
-def best_kb_match(user_text, cutoff=MATCH_CUTOFF):
+# Preprocess patterns for faster matching (lowercase)
+for intent in intents:
+    patterns = intent.get("patterns", [])
+    intent["_patterns_lc"] = [p.lower() for p in patterns if isinstance(p, str)]
+
+def extract_user_text_from_request(data):
     """
-    Return (tag, response, score) if a match found above cutoff, else (None, None, 0)
+    Return the most relevant user text to match against intents or send to Gemini.
+    Supports:
+      - {"messages": [{ "sender":"user"/"bot", "text": "..." }, ...]}
+      - {"contents": [ ... ]} where elements may be {"text":"..."} or generative format
+    Strategy:
+      - If 'messages' exists, take the last message whose sender is 'user' (case-insensitive)
+        or the last message overall if no explicit user entry.
+      - Else, if 'contents' is present, take the last dict element that has 'text' or parts.
+      - Else, fallback to empty string.
     """
-    q = user_text.strip().lower()
-    if not q:
-        return None, None, 0.0
+    # messages style
+    messages = data.get("messages")
+    if isinstance(messages, list) and len(messages) > 0:
+        # find last user message
+        for m in reversed(messages):
+            sender = (m.get("sender") or "").lower()
+            if sender == "user":
+                return m.get("text", "") or ""
+        # fallback: last message text
+        last = messages[-1]
+        return last.get("text", "") if isinstance(last, dict) else str(last)
 
-    # get close pattern matches
-    matches = difflib.get_close_matches(q, all_patterns, n=3, cutoff=cutoff)
-    if matches:
-        best = matches[0]
-        tag = pattern_to_tag[best]
-        responses = tag_to_responses.get(tag) or []
-        # rotate / pick first
-        resp = responses[0] if responses else "Sorry, no canned response available."
-        # compute ratio as score
-        score = difflib.SequenceMatcher(None, q, best).ratio()
-        return tag, resp, score
+    # contents style
+    contents = data.get("contents")
+    if isinstance(contents, list) and len(contents) > 0:
+        # look for dicts with 'text' or 'parts'
+        for c in reversed(contents):
+            if isinstance(c, dict):
+                if "text" in c and isinstance(c["text"], str):
+                    return c["text"]
+                if "parts" in c and isinstance(c["parts"], list) and len(c["parts"]) > 0:
+                    # parts are often [{"text":"..."}]
+                    p0 = c["parts"][-1]
+                    if isinstance(p0, dict) and "text" in p0:
+                        return p0["text"]
+            elif isinstance(c, str):
+                return c
+        # fallback: stringify last element
+        last = contents[-1]
+        return last.get("text", "") if isinstance(last, dict) else str(last)
 
-    # No direct close-match: try fuzzy score against each pattern to find highest score
-    best_score = 0.0
-    best_pattern = None
-    for p in all_patterns:
-        score = difflib.SequenceMatcher(None, q, p).ratio()
-        if score > best_score:
-            best_score = score
-            best_pattern = p
-    if best_score >= cutoff:
-        tag = pattern_to_tag[best_pattern]
-        resp = tag_to_responses.get(tag, [""])[0]
-        return tag, resp, best_score
+    # try message raw 'text' field
+    if "text" in data and isinstance(data["text"], str):
+        return data["text"]
 
-    return None, None, 0.0
+    return ""
 
+def match_intent(user_text):
+    """
+    Try to match user_text to an intent in intents (loaded from intents.json).
+    Simple strategy:
+      - Lowercase the user_text.
+      - For each pattern in intents, check if the pattern is a substring of user_text or vice-versa.
+      - Prefer exact word-boundary matches where possible.
+      - Ignore the 'unrecognized_input' tag to avoid accidentally matching a catch-all pattern like '.*'.
+    Returns: (intent_obj or None)
+    """
+    if not user_text:
+        return None
+    text = user_text.lower()
 
-def save_chat_history(question, answer, source, intent_tag=None):
-    try:
-        entry = {
-            "question": question,
-            "answer": answer,
-            "intent": intent_tag,
-            "source": source,
-            "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-        }
-        data = []
-        if CHAT_HISTORY_FILE.exists():
+    # clean text for word-boundary searching
+    for intent in intents:
+        tag = intent.get("tag", "")
+        # skip the catch-all / fallback intent because we want to fallback to AI instead
+        if tag == "unrecognized_input":
+            continue
+
+        patterns = intent.get("_patterns_lc", [])
+        for patt in patterns:
+            if not patt:
+                continue
+            # If the pattern looks like a plain phrase, try word-boundary match first
             try:
-                with CHAT_HISTORY_FILE.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = []
-
-        data.append(entry)
-
-        # keep only last 200 entries to avoid unbounded growth
-        data = data[-200:]
-        with CHAT_HISTORY_FILE.open("w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-    except Exception:
-        # don't crash on history save errors
-        traceback.print_exc()
-
-
-def call_gemini(prompt_text):
-    """
-    Attempts to call Gemini using google.generativeai client.
-    Returns tuple (reply_text, error_if_any)
-    The function tries several common shapes of responses to be robust across SDK versions.
-    """
-    api_key = os.environ.get("GENAI_API_KEY") or os.environ.get("GENAI_API_KEY")
-    if not api_key:
-        return None, "Gemini API key not configured. Set environment variable GOOGLE_API_KEY."
-
-    try:
-        import google.generativeai as genai
-    except Exception as e:
-        return None, ("google-generativeai package not installed or import failed: " + str(e))
-
-    try:
-        # configure client
-        # note: some older/newer versions use different config APIs
-        try:
-            genai.configure(api_key=api_key)
-        except Exception:
-            # some releases prefer direct assignment
-            try:
-                genai.api_key = api_key
-            except Exception:
+                # escape and use word boundaries
+                escaped = re.escape(patt)
+                # If pattern contains non-word characters/spaces, simple in-check is fine
+                if re.search(r"\b" + escaped + r"\b", text):
+                    return intent
+            except re.error:
+                # fallback to substring when regex escaping fails
                 pass
 
-        # Attempt several call styles to maximize compatibility
-        # 1) genai.generate_text (simple)
-        if hasattr(genai, "generate_text"):
-            try:
-                resp = genai.generate_text(model=GEMINI_MODEL, text=prompt_text)
-                # resp may be object or dict-like
-                if hasattr(resp, "text") and getattr(resp, "text"):
-                    return getattr(resp, "text"), None
-                if isinstance(resp, dict):
-                    # try common keys
-                    for k in ("output", "response", "candidates", "text"):
-                        if k in resp:
-                            # try to extract text
-                            val = resp[k]
-                            if isinstance(val, str):
-                                return val, None
-                            if isinstance(val, dict) and "text" in val:
-                                return val["text"], None
-                            if isinstance(val, list) and len(val) and isinstance(val[0], dict):
-                                # candidate list
-                                candidate = val[0]
-                                # nested content
-                                if "content" in candidate and isinstance(candidate["content"], dict):
-                                    parts = candidate["content"].get("parts")
-                                    if parts and isinstance(parts, list) and parts:
-                                        return parts[0], None
-                                # try candidate.get("text")
-                                if "text" in candidate:
-                                    return candidate["text"], None
-                # fallback stringify
-                return str(resp), None
-            except Exception:
-                traceback.print_exc()
+            # substring checks (pattern in text or text in pattern)
+            if patt in text or text in patt:
+                return intent
 
-        # 2) genai.generate (newer generic generate with messages / input)
-        if hasattr(genai, "generate"):
-            try:
-                # Try a simple call shape
-                resp = genai.generate(model=GEMINI_MODEL, text=prompt_text)
-                # parse
-                if isinstance(resp, dict):
-                    # check candidates
-                    candidates = resp.get("candidates") or resp.get("outputs")
-                    if candidates and isinstance(candidates, list) and candidates:
-                        first = candidates[0]
-                        # try several nested paths
-                        text = None
-                        if isinstance(first, dict):
-                            # content.parts style
-                            content = first.get("content")
-                            if content and isinstance(content, dict):
-                                parts = content.get("parts")
-                                if parts and len(parts) > 0:
-                                    text = parts[0]
-                            if not text and "output" in first:
-                                text = first.get("output")
-                            if not text and "text" in first:
-                                text = first.get("text")
-                        if text:
-                            return text, None
-                return str(resp), None
-            except Exception:
-                traceback.print_exc()
+    return None
 
-        # 3) genai.client or model objects pattern (older sample code)
-        # Try to find any callable in genai module that might accept 'prompt' or 'messages'
-        for fn_name in ("client", "models", "Model", "TextModel"):
-            fn = getattr(genai, fn_name, None)
-            if fn:
+@app.route("/")
+def home():
+    return "Flask backend is running! Use /chat or /api/chat to chat."
+
+# Both endpoints map to same handler so frontend can call /chat or /api/chat
+@app.route("/chat", methods=["OPTIONS", "POST"])
+@app.route("/api/chat", methods=["OPTIONS", "POST"])
+def chat():
+    # Flask-CORS handles OPTIONS, but we accept it to avoid 404s in some setups
+    if request.method == "OPTIONS":
+        return jsonify({"ok": True}), 200
+
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    messages = data.get("messages")
+    contents = data.get("contents")
+    if not messages and not contents and not data.get("text") and not data.get("contents"):
+        return jsonify({"error": "No messages/contents provided or invalid format"}), 400
+
+    # Extract the single user text we will attempt to answer from intents.json first
+    user_text = extract_user_text_from_request(data)
+    print("Extracted user text for intent matching / AI:", user_text)
+
+    # 1) Try to match to intents.json
+    matched_intent = match_intent(user_text)
+    if matched_intent:
+        # choose a random response from intent
+        responses = matched_intent.get("responses", [])
+        if responses:
+            reply_text = random.choice(responses)
+            return jsonify({"reply": reply_text, "source": "intents", "intent": matched_intent.get("tag")}), 200
+
+    # 2) No intent match -> fall back to AI (Gemini)
+    # Normalize into a list of content-parts acceptable to your model.generate_content usage
+    normalized = []
+
+    if messages and isinstance(messages, list):
+        for m in messages:
+            role = m.get("sender", "").lower()
+            if role not in ("user", "bot", "model", "assistant"):
+                role = "model" if role == "bot" else "user"
+            text = m.get("text", "")
+            normalized.append({"role": "user" if role == "user" else "model", "parts": [{"text": text}]})
+    elif contents and isinstance(contents, list):
+        for c in contents:
+            if isinstance(c, dict) and "role" in c and "parts" in c:
+                normalized.append(c)
+            elif isinstance(c, dict) and "text" in c:
+                normalized.append({"role": "user", "parts": [{"text": c["text"]}]})
+            else:
+                normalized.append({"role": "user", "parts": [{"text": str(c)}]})
+    else:
+        # fallback: use the extracted user_text as single user message
+        normalized.append({"role": "user", "parts": [{"text": user_text}]})
+
+    print("Normalized request to send to Gemini:", normalized)
+
+    try:
+        response = model.generate_content(normalized)
+
+        # Robustly extract text from different response shapes
+        reply_text = None
+
+        # 1) Some SDKs return an object with .text
+        if hasattr(response, "text") and getattr(response, "text"):
+            reply_text = getattr(response, "text")
+
+        # 2) dict-style (from .to_dict() or JSON)
+        elif isinstance(response, dict):
+            if response.get("reply"):
+                reply_text = response.get("reply")
+            elif response.get("text"):
+                reply_text = response.get("text")
+            elif response.get("candidates"):
                 try:
-                    # naive attempt: call with prompt
-                    maybe = fn(prompt_text)
-                    if maybe:
-                        return str(maybe), None
+                    reply_text = response["candidates"][0]["content"]["parts"][0]["text"]
                 except Exception:
-                    continue
+                    reply_text = None
 
-        return None, "Could not call Gemini with installed google-generativeai client; check SDK version & docs."
+        # 3) object with candidates attribute
+        else:
+            candidates = getattr(response, "candidates", None)
+            if candidates:
+                try:
+                    cand0 = candidates[0]
+                    content = cand0.get("content") if isinstance(cand0, dict) else getattr(cand0, "content", None)
+                    if content:
+                        parts = content.get("parts") if isinstance(content, dict) else getattr(content, "parts", None)
+                        if parts and len(parts) > 0:
+                            part0 = parts[0]
+                            reply_text = part0.get("text") if isinstance(part0, dict) else getattr(part0, "text", None)
+                except Exception:
+                    reply_text = None
+
+        if not reply_text:
+            try:
+                reply_text = str(response)
+            except Exception:
+                reply_text = "No textual reply found in model response."
+
+        print("Reply extracted from AI:", reply_text)
+        return jsonify({"reply": reply_text, "source": "ai"}), 200
 
     except Exception as e:
         traceback.print_exc()
-        return None, f"Error when calling Gemini: {str(e)}"
-
-
-@app.route("/ask", methods=["POST"])
-def ask():
-    """
-    Request JSON: { "question": "..." }
-    Response JSON: { "reply": "...", "intent": "<tag or null>", "source": "kb|gemini|error", "score": float }
-    """
-    data = request.get_json(force=True, silent=True)
-    if not data:
-        return jsonify({"error": "Invalid JSON payload"}), 400
-
-    question = data.get("question") or data.get("q") or data.get("text")
-    if not question:
-        return jsonify({"error": "Missing 'question' field in JSON"}), 400
-
-    # 1) Try KB match
-    intent_tag, kb_response, score = best_kb_match(question, cutoff=MATCH_CUTOFF)
-    if intent_tag:
-        # found KB match
-        save_chat_history(question, kb_response, source="kb", intent_tag=intent_tag)
-        return jsonify({
-            "reply": kb_response,
-            "intent": intent_tag,
-            "source": "kb",
-            "score": score
-        }), 200
-
-    # 2) No good KB match: fall back to Gemini
-    gemini_prompt = (
-        "You are a helpful assistant. The user asked: "
-        + question
-        + "\n\nRespond concisely (1-3 short paragraphs). If the question is about current events, mention when you were last updated."
-    )
-    reply_text, err = call_gemini(gemini_prompt)
-    if err:
-        # return helpful error to user (still include KB fallback message)
-        fallback_msg = "I couldn't find a close match in my local knowledge base."
-        save_chat_history(question, fallback_msg, source="fallback_no_gemini", intent_tag=None)
-        return jsonify({
-            "reply": fallback_msg,
-            "intent": None,
-            "source": "error",
-            "error": err
-        }), 503
-
-    # success from Gemini
-    save_chat_history(question, reply_text, source="gemini", intent_tag=None)
-    return jsonify({
-        "reply": reply_text,
-        "intent": None,
-        "source": "gemini",
-        "score": None
-    }), 200
-
-
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"}), 200
-
+        return jsonify({"error": f"Error calling Gemini API: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    port = int(os.environ.get("PORT", 5000))
+    import os
+    port = int(os.environ.get("PORT", 5000))  # Use Render's PORT if available
     app.run(host="0.0.0.0", port=port, debug=True)
