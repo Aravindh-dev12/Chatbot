@@ -1,0 +1,5 @@
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "build"
+  functions = "frontend/netlify/functions" # This line is optional if you don't use Netlify Functions

@@ -1,0 +1,12 @@
+{
+  "name": "python-project-2-root",
+  "version": "1.0.0",
+  "private": true,
+  "homepage": "https://markdennis2121.github.io/ChatBot/",
+  "scripts": {
+    "deploy-frontend": "npm run build --prefix frontend && gh-pages -d frontend/build"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0"
+  }
+}
