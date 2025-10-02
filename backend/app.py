@@ -9,6 +9,7 @@ import traceback
 load_dotenv()
 
 app = Flask(__name__)
+# Dev CORS - allow everything for local development
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 API_KEY = os.getenv("GENAI_API_KEY")
@@ -134,4 +135,3 @@ if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5000))  # Use Render's PORT if available
     app.run(host="0.0.0.0", port=port, debug=True)
-
