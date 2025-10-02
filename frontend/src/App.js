@@ -172,6 +172,9 @@ function App() {
     }
   };
 
+  // API base (points to your Flask backend). Set REACT_APP_API_BASE_URL in .env if needed.
+  const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:5000";
+
   const sendMessage = useCallback(async (predefinedMessage = null) => {
     const messageToSend = predefinedMessage !== null ? predefinedMessage : message.trim();
 
@@ -329,11 +332,8 @@ function App() {
         },
       };
 
-      // Use environment variable for API key
-      const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-      const response = await fetch(apiUrl, {
+      // --- NEW: send request to your Flask backend (no API key in frontend) ---
+      const response = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -341,22 +341,14 @@ function App() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`API Error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`API Error: ${response.status} - ${errorData.message || response.statusText}`);
       }
 
       const result = await response.json();
-      let replyText = "Sorry, I couldn't get a response from Chatbot.";
 
-      if (result.candidates && result.candidates.length > 0 &&
-          result.candidates[0].content && result.candidates[0].content.parts &&
-          result.candidates[0].content.parts.length > 0) {
-        replyText = result.candidates[0].content.parts[0].text;
-      } else if (result.error) {
-        replyText = `Error from API: ${result.error.message}`;
-      } else {
-        replyText = "An unexpected response was received from Chatbot. Please try again.";
-      }
+      // Try multiple possible response shapes coming from backend
+      const replyText = result.reply || result.text || (result.candidates && result.candidates[0]?.content?.parts?.[0]?.text) || result.message || result.answer || "Sorry, I couldn't get a response from Chatbot.";
 
       if (!signal.aborted) {
         await typeEffect(replyText);
@@ -373,7 +365,7 @@ function App() {
     } catch (error) {
       if (error.name !== "AbortError") {
         let errorMsg = `Error connecting to Chatbot: ${error.message || "Please check your network."}`;
-        if (error.message.includes("API Error")) {
+        if (error.message && error.message.includes("API Error")) {
             errorMsg = `Chatbot encountered an issue: ${error.message}. Please try again later.`;
         }
         setChatLog((prev) => [...prev, { sender: "bot", text: errorMsg, timestamp: new Date() }]);
@@ -416,14 +408,12 @@ function App() {
               darkMode 
                 ? "bg-gradient-to-r from-purple-600 to-indigo-600" 
                 : "bg-gradient-to-r from-blue-400 to-purple-400"
-            }`}
-          >
+            }`}>
             {/* Toggle Knob */}
             <div
               className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transform transition-all duration-500 ease-in-out ${
                 darkMode ? "translate-x-8" : "translate-x-0"
-              }`}
-            >
+              }`}>
               {/* Icons inside toggle */}
               <div className="absolute inset-0 flex items-center justify-center">
                 {darkMode ? (
@@ -471,8 +461,7 @@ function App() {
             key={index}
             className={`flex flex-col max-w-[90%] sm:max-w-[75%] text-sm sm:text-base ${
               msg.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"
-            }`}
-          >
+            }`}>
             <span className={`text-xs font-medium mb-1 opacity-70 flex items-center ${
               msg.sender === "user"
                 ? darkMode ? "text-blue-300" : "text-blue-600"
@@ -491,8 +480,7 @@ function App() {
                   : darkMode
                     ? "bg-gray-800 text-gray-50"
                     : "bg-gray-100 text-gray-800"
-              }`}
-            >
+              }`}>
               {msg.text}
             </div>
           </div>
@@ -507,8 +495,7 @@ function App() {
             <div
               className={`px-4 py-2 sm:px-5 sm:py-3 rounded-2xl italic break-words whitespace-pre-wrap shadow-md ${
                 darkMode ? "bg-gray-800 text-gray-50" : "bg-gray-100 text-gray-800"
-              }`}
-            >
+              }`}>
               {botTypingText}
               <span className="blinking-cursor text-purple-400">|</span>
             </div>
@@ -583,8 +570,7 @@ function App() {
                 ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
               }
-              disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
+              disabled:opacity-40 disabled:cursor-not-allowed`}>
             <PlusIcon className="h-5 w-5" />
           </button>
           
@@ -600,8 +586,7 @@ function App() {
                 : darkMode
                 ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500"
                 : "bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-400 hover:to-purple-400"}
-              disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
+              disabled:opacity-40 disabled:cursor-not-allowed`}>
             {loading ? (
               <StopIcon className="h-5 w-5" />
             ) : (
