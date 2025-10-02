@@ -22,7 +22,6 @@
       ],
       "context_set": "greeting"
     },
-
     {
       "tag": "news_trending",
       "patterns": [
@@ -40,7 +39,6 @@
         "Give me a topic (e.g., 'global', 'India', 'technology') and I'll show recent headlines. For live updates, connect a news API."
       ]
     },
-
     {
       "tag": "politics",
       "patterns": [
@@ -56,7 +54,6 @@
         "For detailed, up-to-the-minute election results, connect a live news or election API — I can prepare summaries or explain implications."
       ]
     },
-
     {
       "tag": "elections",
       "patterns": [
@@ -70,7 +67,6 @@
         "I can provide election schedules, major candidates, and recent results if a data feed is enabled. Which election are you asking about?"
       ]
     },
-
     {
       "tag": "global_conflict",
       "patterns": [
@@ -84,7 +80,6 @@
         "I can outline reported developments and reliable sources on conflicts. For sensitive or real-time updates, it's best to check official news outlets as well."
       ]
     },
-
     {
       "tag": "economy_inflation",
       "patterns": [
@@ -98,7 +93,6 @@
         "Inflation is influenced by supply, demand, and policy. I can fetch CPI and central bank signals if a finance feed is available — otherwise I can explain what those indicators mean."
       ]
     },
-
     {
       "tag": "central_bank",
       "patterns": [
@@ -111,7 +105,6 @@
         "I can summarize recent central bank announcements (rate decisions, guidance) if you specify the country. Want RBI, Fed, or ECB?"
       ]
     },
-
     {
       "tag": "ai_ethics",
       "patterns": [
@@ -124,7 +117,6 @@
         "AI ethics covers bias, explainability, and safety. I can summarize recent regulatory moves or explain mitigation strategies for biased models."
       ]
     },
-
     {
       "tag": "climate_change",
       "patterns": [
@@ -137,7 +129,6 @@
         "I can provide summaries of climate reports, policy updates, and notable events (e.g., conferences). Say 'global' or a country/region for focused info."
       ]
     },
-
     {
       "tag": "energy",
       "patterns": [
@@ -150,7 +141,6 @@
         "Energy markets move on supply, demand, and policy. I can summarize recent moves in oil, gas or renewables if you specify the market or ticker."
       ]
     },
-
     {
       "tag": "startups_news",
       "patterns": [
@@ -166,7 +156,6 @@
         "I can summarize recent startup funding, acquisitions, and product launches — say the region or sector (e.g., 'India fintech')."
       ]
     },
-
     {
       "tag": "tech_news",
       "patterns": [
@@ -180,7 +169,6 @@
         "I can list recent tech product launches, major AI developments, and company announcements. Which subtopic interests you?"
       ]
     },
-
     {
       "tag": "market_updates",
       "patterns": [
@@ -194,7 +182,6 @@
         "I can provide market direction and notable movers if you connect a finance API. Would you like a quick summary or a ticker lookup?"
       ]
     },
-
     {
       "tag": "sports",
       "patterns": [
@@ -208,7 +195,6 @@
         "I can fetch live scores and recent results if a sports data feed is enabled. Tell me the sport or team you care about."
       ]
     },
-
     {
       "tag": "entertainment",
       "patterns": [
@@ -222,7 +208,6 @@
         "I can summarize entertainment headlines and new releases. Want movies, TV, or celebrity updates?"
       ]
     },
-
     {
       "tag": "health_public",
       "patterns": [
@@ -236,7 +221,6 @@
         "For public health alerts, I can summarize official advisories; always cross-check with official health departments or WHO for live guidance."
       ]
     },
-
     {
       "tag": "education_policy",
       "patterns": [
@@ -250,7 +234,6 @@
         "I can provide summaries of education policy and major announcements. Tell me the country or exam board for precise info."
       ]
     },
-
     {
       "tag": "jobs_career",
       "patterns": [
@@ -264,7 +247,6 @@
         "I can share hiring trends, quick resume tips, or common interview prep steps. Tell me the role or industry and I’ll tailor the advice."
       ]
     },
-
     {
       "tag": "travel_alerts",
       "patterns": [
@@ -278,7 +260,6 @@
         "Travel restrictions and advisories change fast — I can summarize official advisories for a country/route if you name it, or point you to the government travel site."
       ]
     },
-
     {
       "tag": "short_explainer",
       "patterns": [
@@ -291,7 +272,6 @@
         "Sure — ask me a topic and I'll give a one-line explainer, then an optional short paragraph if you want more detail."
       ]
     },
-
     {
       "tag": "data_sources",
       "patterns": [
@@ -304,7 +284,6 @@
         "I can be configured to use news APIs (NewsAPI, GDELT), finance feeds (Alpha Vantage, Yahoo), and specialized outlets. Tell me which data type and I can recommend sources."
       ]
     },
-
     {
       "tag": "subscribe_alerts",
       "patterns": [
@@ -318,7 +297,6 @@
         "I can prepare a subscription flow (daily digest, topic filters) if you provide an email or enable push integration. How often do you want updates?"
       ]
     },
-
     {
       "tag": "feedback",
       "patterns": [
@@ -332,7 +310,6 @@
         "Thanks — I will log this feedback to improve the knowledge base. Want to add a short note explaining the issue?"
       ]
     },
-
     {
       "tag": "explain_terms",
       "patterns": [
@@ -348,7 +325,6 @@
         "Quantitative easing — a central bank policy to buy assets to inject liquidity into the economy."
       ]
     },
-
     {
       "tag": "small_talk",
       "patterns": [
@@ -362,7 +338,6 @@
         "I don't sleep — I'm here whenever you need a quick news summary or an explainer. What would you like?"
       ]
     },
-
     {
       "tag": "unrecognized_input",
       "patterns": [
